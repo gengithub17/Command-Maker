@@ -33,6 +33,6 @@
 画面右上のボタンにより、表示するコマンドを変更できます。
 
 ### コマンド名編集画面
-![image](https://github.com/gengithub17/Command-Maker/assets/25129056/82c92f95-0856-4339-8970-2a1e8aa521c6)
+![image](https://github.com/gengithub17/Command-Maker/assets/25129056/82c92f95-0856-4339-8970-2a1e8aa521c6)  
 保存されているコマンドデータの保存名を変更できます。  
 OKボタンを押すことにより変更が保存されます。
