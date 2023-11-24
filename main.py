@@ -372,7 +372,8 @@ class CmdFrame(ttk.Frame):
 				self.savedlist_window()
 			y = 0
 			put(ttk.Label(self, text="Old Name",font=self.font()),xy=(0,y),w=8)
-			put(ttk.Label(self, text="New Name",font=self.font()),xy=(8,y),w=4)
+			put(ttk.Label(self, text="New Name",font=self.font()),xy=(8,y),w=2)
+			put(ttk.Button(self, text="Back",command=self.savedlist_window), xy=(10,y),w=2)
 			if start>0:
 				put(ttk.Button(self, text="▲", command=partial(edit,start-1,new_name_list)),xy=(12,y))
 			if len(old_name_list)>start+9:
