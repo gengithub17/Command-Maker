@@ -10,10 +10,6 @@ import subprocess
 # メインウィンドウの作成
 CELL_WIDTH, CELL_HEIGHT = 50, 50
 WINDOW_WIDTH, WINDOW_HEIGHT = 16*CELL_WIDTH, 10*CELL_HEIGHT
-root = tk.Tk()
-root.geometry(f'{WINDOW_WIDTH}x{WINDOW_HEIGHT}')
-root.title("Command Maker")
-ttk.Style().theme_use("default")
 
 # データ保存ファイル
 FILEPATH = os.path.dirname(os.path.abspath(__file__))
@@ -21,21 +17,11 @@ SAVEFILE = f"{FILEPATH}/.savedata.json"
 
 # ショートカットキーのため、実行システムを判別
 SYSTEM:str = None
-CTRL = 0x0
-if sys.platform.lower() == "darwin":
-	CTRL = 0x8 #MacではCommandキー
-	SYSTEM = "Mac"
-elif sys.platform.lower() == "win":
-	CTRL = 0x4
-	SYSTEM = "Win"
-elif sys.platform.lower() == "Linux":
-	CTRL = 0x4
-	SYSTEM = "Linux"
-else:
-	messagebox.showwarning("System Warning","Unrecognized Operation System.\nYou can't use shortcut keys.")
+CTRL = None
 
 def put(widget:ttk.Widget, xy:tuple[int,int],w=1,h=1):
-	widget.place(x=(xy[0]+w/2)*CELL_WIDTH,y=(xy[1]+h/2)*CELL_HEIGHT,width=w*CELL_WIDTH,height=h*CELL_HEIGHT,anchor=tk.CENTER)
+	widget.place(x=(xy[0]+w/2)*CELL_WIDTH,y=(xy[1]+h/2)*CELL_HEIGHT,
+			width=w*CELL_WIDTH,height=h*CELL_HEIGHT,anchor=tk.CENTER)
 
 class CmdFrame(ttk.Frame):
 	SYSTEM = platform.system()
@@ -44,6 +30,19 @@ class CmdFrame(ttk.Frame):
 		super().__init__(root,width=WINDOW_WIDTH, height=WINDOW_HEIGHT)
 		self.pack()
 		self.parent = root
+		self.define_vars()
+		self.console.pack(fill=tk.BOTH)
+		self.scrollbar.pack(fill=tk.Y,side=tk.RIGHT)
+		# 編集された際にunsavedに変更するトリガー
+		self.name.trace("w",lambda *args:setattr(self,'saved',False))
+		self.cmd.trace("w",lambda *args:setattr(self,'saved',False))
+		self.pwd.trace("w",lambda *args:setattr(self,'saved',False))
+		self.relpath.trace("w",lambda *args:setattr(self,'saved',False))
+		# 未保存の場合はアプリ終了前に警告
+		self.parent.protocol("WM_DELETE_WINDOW", self.close_window)
+		self.placement()
+	
+	def define_vars(self):
 		self.name = tk.StringVar()
 		self.cmd = tk.StringVar()
 		self.pwd = tk.StringVar()
@@ -57,13 +56,6 @@ class CmdFrame(ttk.Frame):
 		self.console.config(yscrollcommand=self.scrollbar.set)
 		self.console.tag_config("success",foreground="blue",font=("Arial",12))
 		self.console.tag_config("fail",foreground="red",font=("Arial",12))
-		self.console.pack(fill=tk.BOTH)
-		self.scrollbar.pack(fill=tk.Y,side=tk.RIGHT)
-		self.placement()
-		self.name.trace("w",lambda *args:setattr(self,'saved',False))
-		self.cmd.trace("w",lambda *args:setattr(self,'saved',False))
-		self.pwd.trace("w",lambda *args:setattr(self,'saved',False))
-		self.relpath.trace("w",lambda *args:setattr(self,'saved',False))
 
 	def clear_data(self):
 		self.name.set("")
@@ -74,7 +66,8 @@ class CmdFrame(ttk.Frame):
 		self.saved = True
 	
 	def placement(self, start=0):
-		self.parent.bind('<Key>',self.shortcut)
+		if not CTRL is None:
+			self.parent.bind('<Key>',self.shortcut)
 		for child in self.winfo_children():
 			child.destroy()
 		y = 0
@@ -196,7 +189,9 @@ class CmdFrame(ttk.Frame):
 		with open(SAVEFILE, "r") as json_file:
 			json_data:dict[str,dict[str,dict]] = json.load(json_file)
 		if self.name.get() not in json_data["data"].keys():
-			if messagebox.askokcancel(title="Save Warning", message=f"{self.name.get()} has not yet been registered.\nDo you want to save as a new data?"):
+			if messagebox.askokcancel(title="Save Warning",
+				message=f"{self.name.get()} has not yet been registered.\n"
+				"Do you want to save as a new data?", default=messagebox.OK):
 				self.saveas()
 			return
 		json_data["data"].update(self.export())
@@ -212,7 +207,9 @@ class CmdFrame(ttk.Frame):
 		with open(SAVEFILE, "r") as json_file:
 			json_data:dict[str,dict[str,dict]] = json.load(json_file)
 		if self.name.get() in json_data["data"].keys():
-			if not messagebox.askokcancel(title="Save Warning", message=f'"{self.name.get()}" is already existing.\nDo you want to overwrite it?'):
+			if not messagebox.askokcancel(title="Save Warning",
+				message=f'"{self.name.get()}" is already existing.\nDo you want to overwrite it?',
+					default=messagebox.OK):
 				return
 		json_data["data"].update(self.export())
 		with open(SAVEFILE, "w") as json_file:
@@ -246,7 +243,8 @@ class CmdFrame(ttk.Frame):
 	
 	def unsaved_ok(self):
 		if self.saved or not self.command(): return True
-		return messagebox.askokcancel("Save Warning","Currently data is not saved.\nIgnore and continue?")
+		return messagebox.askokcancel("Save Warning","Currently data is not saved.\nIgnore and continue?",
+					default=messagebox.CANCEL)
 	
 	def translate_path(self):
 		self.parent.focus_set()
@@ -283,7 +281,8 @@ class CmdFrame(ttk.Frame):
 		if os.path.isdir(self.pwd.get()):
 			if SYSTEM == "Win": cdcmd = f"cd {self.pwd.get()} ; "
 			else: cdcmd = f"cd {self.pwd.get()} && "
-		result = subprocess.run(f"{cdcmd}{self.command()}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+		result = subprocess.run(f"{cdcmd}{self.command()}", shell=True,
+			stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 		self.console.config(state=tk.NORMAL)
 		if result.returncode == 0:
 			self.console.insert(tk.END, f"$ {self.command()}\n", "success")
@@ -416,6 +415,10 @@ class CmdFrame(ttk.Frame):
 			for var in vardict.values():
 				var.set(True)
 		put(ttk.Button(self, text="Select All", command=select_all), xy=(8,0),w=2)
+	
+	def close_window(self):
+		if self.unsaved_ok():
+			self.parent.destroy()
 
 	@classmethod
 	def font(cls,size=20):
@@ -467,7 +470,25 @@ class Arg:
 	def __repr__(self) -> str:
 		return self.__str__()
 
-cmdframe = CmdFrame(root)
 
-# メインループの開始
-root.mainloop()
+if __name__ == "__main__":
+	# システム判別
+	if sys.platform.lower() == "darwin":
+		CTRL = 0x8 #MacではCommandキー
+		SYSTEM = "Mac"
+	elif sys.platform.lower() == "win":
+		CTRL = 0x4
+		SYSTEM = "Win"
+	elif sys.platform.lower() == "Linux":
+		CTRL = 0x4
+		SYSTEM = "Linux"
+	else:
+		messagebox.showwarning("System Warning","Unrecognized Operation System.\n"
+							"You can't use shortcut keys.")
+
+	root = tk.Tk()
+	root.geometry(f'{WINDOW_WIDTH}x{WINDOW_HEIGHT}')
+	root.title("Command Maker")
+	ttk.Style().theme_use("default")
+	cmdframe = CmdFrame(root)
+	root.mainloop()
